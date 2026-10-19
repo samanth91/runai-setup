@@ -88,10 +88,16 @@ install_macos() {
   if ! command -v brew >/dev/null 2>&1; then
     die "Homebrew is required on macOS. Install it from https://brew.sh and rerun."
   fi
-  brew install kubectl helm kind k9s
+  brew install kubernetes-cli helm kind k9s git python3
+  if ! command -v curl >/dev/null 2>&1; then
+    brew install curl
+  fi
+  if ! command -v make >/dev/null 2>&1; then
+    die "macOS needs the Xcode Command Line Tools so make exists. Run: xcode-select --install"
+  fi
   if ! command -v docker >/dev/null 2>&1; then
     brew install --cask docker
-    echo "Start Docker Desktop, then rerun the local install."
+    echo "Open Docker Desktop, wait until it is running, then run: make local"
   fi
 }
 

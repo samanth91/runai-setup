@@ -1,12 +1,16 @@
 #!/bin/bash
 # Detect the OS, then install NVIDIA Run:ai with the matching package commands.
 #
+#   make check
+#   make local
+#   make prerequisites
+#   make production
+#   make production-apply
+#
+# The same entry points work without make:
 #   ./install.sh --check
-#   ./install.sh
-#   ./install.sh --mode prerequisites
 #   ./install.sh --mode local
-#   ./install.sh --mode production
-#   sudo ./install.sh --mode production --apply
+#   ./install.sh --mode production --apply
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +22,7 @@ detect_os
 
 MODE="local"
 CHECK_ONLY=0
-PASS=()
+APPLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --check) CHECK_ONLY=1; shift ;;
@@ -27,11 +31,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --apply)
-      PASS+=("--apply")
+      APPLY=1
       shift
       ;;
     -h|--help)
-      sed -n '2,12p' "$0"
+      sed -n '4,13p' "$0"
       exit 0
       ;;
     *)
@@ -71,9 +75,18 @@ case "${MODE}" in
     exec bash "${HERE}/02-local-kind-cluster.sh"
     ;;
   production)
-    if [[ "$(id -u)" -eq 0 ]]; then
-      exec bash "${HERE}/03-production-single-node.sh" "${PASS[@]}"
+    if [[ "${OS_FAMILY}" != "debian" && "${OS_FAMILY}" != "rhel" ]]; then
+      die "Production kubeadm packages are automated for Debian/Ubuntu/Pop and RHEL/Fedora. This host is ${OS_PRETTY} (${OS_FAMILY}). On this machine run: make local"
     fi
-    exec sudo bash "${HERE}/03-production-single-node.sh" "${PASS[@]}"
+    if [[ "$(id -u)" -eq 0 ]]; then
+      if [[ "${APPLY}" -eq 1 ]]; then
+        exec bash "${HERE}/03-production-single-node.sh" --apply
+      fi
+      exec bash "${HERE}/03-production-single-node.sh"
+    fi
+    if [[ "${APPLY}" -eq 1 ]]; then
+      exec sudo bash "${HERE}/03-production-single-node.sh" --apply
+    fi
+    exec sudo bash "${HERE}/03-production-single-node.sh"
     ;;
 esac

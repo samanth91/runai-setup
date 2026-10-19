@@ -35,7 +35,33 @@ target_user() {
 
 target_home() {
   local user="$1"
-  getent passwd "${user}" | cut -d: -f6
+  if command -v getent >/dev/null 2>&1; then
+    getent passwd "${user}" | cut -d: -f6
+    return
+  fi
+  # macOS has no getent. Production install does not run there.
+  dscl . -read "/Users/${user}" NFSHomeDirectory 2>/dev/null | awk '{print $2}'
+}
+
+# Kind image builds are heavy. Under about 24 GB of RAM, build two at a time.
+host_mem_kb() {
+  local bytes
+  if [[ "${OS_KERNEL}" == "Darwin" ]]; then
+    bytes="$(sysctl -n hw.memsize 2>/dev/null || echo 0)"
+    echo $(( bytes / 1024 ))
+    return 0
+  fi
+  awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 0
+}
+
+default_parallel() {
+  local mem_kb
+  mem_kb="$(host_mem_kb)"
+  if [[ "${mem_kb}" -gt 0 && "${mem_kb}" -lt 24000000 ]]; then
+    echo 2
+    return 0
+  fi
+  echo 4
 }
 
 runai_plan() {

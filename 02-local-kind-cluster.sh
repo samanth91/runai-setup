@@ -4,7 +4,7 @@
 # Otherwise the upstream local-dev.sh simulated GPUs are used.
 #
 # Run as your desktop user, not as root:
-#   bash 02-local-kind-cluster.sh
+#   make local
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,12 +33,7 @@ mkdir -p "${BIN}" "${HOME}/src"
 export PATH="${BIN}:${PATH}"
 
 if [[ -z "${PARALLEL}" ]]; then
-  mem_kb="$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-  if [[ "${mem_kb}" -gt 0 && "${mem_kb}" -lt 24000000 ]]; then
-    PARALLEL=2
-  else
-    PARALLEL=4
-  fi
+  PARALLEL="$(default_parallel)"
 fi
 
 if [[ "${OS_FAMILY}" == "macos" ]]; then
@@ -48,10 +43,13 @@ else
 fi
 
 if ! docker info >/dev/null 2>&1; then
+  if [[ "${OS_FAMILY}" == "macos" ]]; then
+    die "Docker is not reachable. Open Docker Desktop, wait until it is running, then run: make local"
+  fi
   if id -nG | grep -qw docker; then
     die "Docker is installed and you are in the docker group, but the daemon is not reachable. Start it and rerun."
   fi
-  die "This shell cannot talk to Docker yet. Run: sg docker -c 'bash ${HERE}/02-local-kind-cluster.sh'"
+  die "This shell cannot talk to Docker yet. Open a new login shell, or run: sg docker -c 'make -C ${HERE} local'"
 fi
 
 download() {
@@ -100,13 +98,10 @@ if ! grep -qF "${DOMAIN}" /etc/hosts; then
   echo "127.0.0.1 ${DOMAIN}" | sudo tee -a /etc/hosts >/dev/null
 fi
 
-GPU_ARGS=()
-if [[ "${OS_FAMILY}" != "macos" ]] && has_nvidia_driver; then
-  GPU_ARGS=(--gpu-operator)
-  log "Using the host NVIDIA driver. The GPU Operator will not replace it."
-else
-  log "Using simulated GPUs."
-fi
-
 cd "${SRC}"
-exec ./local-dev.sh "${GPU_ARGS[@]}" --parallel "${PARALLEL}" --domain "${DOMAIN}"
+if [[ "${OS_FAMILY}" != "macos" ]] && has_nvidia_driver; then
+  log "Using the host NVIDIA driver. The GPU Operator will not replace it."
+  exec ./local-dev.sh --gpu-operator --parallel "${PARALLEL}" --domain "${DOMAIN}"
+fi
+log "Using simulated GPUs."
+exec ./local-dev.sh --parallel "${PARALLEL}" --domain "${DOMAIN}"

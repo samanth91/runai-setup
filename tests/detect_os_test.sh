@@ -78,4 +78,14 @@ detect_os
 [[ "${OS_FAMILY}" != "unsupported" ]]
 [[ "${OS_ARCH}" == "amd64" || "${OS_ARCH}" == "arm64" ]]
 echo "live host: ${OS_PRETTY} family=${OS_FAMILY} arch=${OS_ARCH}"
+
+# shellcheck disable=SC1091
+. "${HERE}/../lib/common.sh"
+host_mem_kb() { echo 23999999; }
+[[ "$(default_parallel)" == "2" ]]
+host_mem_kb() { echo 24000000; }
+[[ "$(default_parallel)" == "4" ]]
+host_mem_kb() { echo 0; }
+[[ "$(default_parallel)" == "4" ]]
+echo "parallel selection passed"
 echo "detect_os tests passed"
